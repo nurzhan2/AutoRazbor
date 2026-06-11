@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Админ{% endblock %} — EuroRazbor</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="icon" href="/static/img/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body class="admin-body">
+<div class="admin-layout">
+    <aside class="admin-sidebar">
+        <div class="admin-logo">
+            <img src="/static/img/logo.jpg" alt="EuroRazbor">
+            EuroRazbor
+        </div>
+        <nav class="admin-nav">
+            <a href="/admin">📊 Главная</a>
+            <a href="/admin/users">👥 Пользователи</a>
+            <a href="/admin/videos">🎬 Видео</a>
+            <a href="/admin/catalog">📦 Каталог</a>
+            <a href="/admin/logout" class="logout-link">🚪 Выйти</a>
+        </nav>
+    </aside>
+    <main class="admin-main">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>

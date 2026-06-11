@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Обучение{% endblock %}
+{% block content %}
+<div class="container page-content">
+    <h1 class="page-title">Обучающие материалы</h1>
+    <p class="page-subtitle">Доступ активен до {{ user.access_until.strftime('%d.%m.%Y') }}</p>
+
+    {% if videos %}
+    <div class="videos-grid">
+        {% for video in videos %}
+        <div class="video-card">
+            <div class="video-number">Урок {{ loop.index }}</div>
+            <h2 class="video-title">{{ video.title }}</h2>
+            {% if video.description %}
+            <p class="video-desc">{{ video.description }}</p>
+            {% endif %}
+            <div class="video-player">
+                {% if 'youtube.com' in video.video_url or 'youtu.be' in video.video_url %}
+                    {% set yt_id = video.video_url.split('/')[-1].split('?v=')[-1].split('v=')[-1] %}
+                    <iframe src="https://www.youtube.com/embed/{{ yt_id }}"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen></iframe>
+                {% elif 'vimeo.com' in video.video_url %}
+                    {% set vm_id = video.video_url.split('/')[-1] %}
+                    <iframe src="https://player.vimeo.com/video/{{ vm_id }}"
+                        frameborder="0"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowfullscreen></iframe>
+                {% else %}
+                    <video controls>
+                        <source src="{{ video.video_url }}">
+                        Ваш браузер не поддерживает видео.
+                    </video>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">Видео ещё не добавлены. Скоро появятся!</div>
+    {% endif %}
+</div>
+{% endblock %}

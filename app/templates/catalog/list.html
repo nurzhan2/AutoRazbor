@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Каталог товаров{% endblock %}
+{% block content %}
+<div class="container page-content">
+    <div class="catalog-header">
+        <h1 class="page-title">Каталог товаров</h1>
+        {% if last_sync %}
+        <span class="sync-badge">Обновлено: {{ last_sync.finished_at.strftime('%d.%m.%Y %H:%M') }}</span>
+        {% endif %}
+    </div>
+
+    <form method="get" action="/catalog" class="filter-form">
+        <div class="filter-row">
+            <input type="text" name="search" value="{{ search }}" placeholder="Поиск по названию или артикулу...">
+            <select name="category">
+                <option value="">Все категории</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" name="min_price" value="{{ min_price }}" placeholder="Цена от">
+            <input type="number" name="max_price" value="{{ max_price }}" placeholder="Цена до">
+            <select name="sort">
+                <option value="updated_desc" {% if sort == 'updated_desc' %}selected{% endif %}>Новые</option>
+                <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Цена ↑</option>
+                <option value="price_desc" {% if sort == 'price_desc' %}selected{% endif %}>Цена ↓</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Найти</button>
+            {% if search or category or min_price or max_price %}
+            <a href="/catalog" class="btn btn-secondary">Сбросить</a>
+            {% endif %}
+        </div>
+    </form>
+
+    <div class="results-info">Найдено товаров: {{ total }}</div>
+
+    {% if products %}
+    <div class="products-grid">
+        {% for product in products %}
+        <a href="/catalog/{{ product.id }}" class="product-card">
+            <div class="product-img">
+                {% if product._photos_list %}
+                <img src="{{ product._photos_list[0] }}" alt="{{ product.title }}" loading="lazy"
+                     onerror="this.src='/static/img/no-photo.svg'">
+                {% else %}
+                <div class="no-photo">📷</div>
+                {% endif %}
+            </div>
+            <div class="product-info">
+                <div class="product-title">{{ product.title }}</div>
+                {% if product.article %}
+                <div class="product-article">Арт: {{ product.article }}</div>
+                {% endif %}
+                {% if product.price %}
+                <div class="product-price">{{ "{:,.0f}".format(product.price) }} ₽</div>
+                {% else %}
+                <div class="product-price no-price">По запросу</div>
+                {% endif %}
+                {% if product.availability %}
+                <div class="product-availability">{{ product.availability }}</div>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    {% if total_pages > 1 %}
+    {% set params = "search=" ~ search ~ "&category=" ~ category ~ "&min_price=" ~ min_price ~ "&max_price=" ~ max_price ~ "&sort=" ~ sort %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="?page=1&{{ params }}" class="page-btn page-btn-arrow" title="Первая">«</a>
+        <a href="?page={{ page - 1 }}&{{ params }}" class="page-btn page-btn-arrow">‹ Назад</a>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+            <span class="page-btn page-btn-active">{{ p }}</span>
+            {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+            <a href="?page={{ p }}&{{ params }}" class="page-btn">{{ p }}</a>
+            {% elif p == page - 3 or p == page + 3 %}
+            <span class="page-dots">…</span>
+            {% endif %}
+        {% endfor %}
+
+        {% if page < total_pages %}
+        <a href="?page={{ page + 1 }}&{{ params }}" class="page-btn page-btn-arrow">Вперёд ›</a>
+        <a href="?page={{ total_pages }}&{{ params }}" class="page-btn page-btn-arrow" title="Последняя">»</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="alert alert-info">Товары не найдены. Попробуйте изменить фильтры.</div>
+    {% endif %}
+</div>
+{% endblock %}

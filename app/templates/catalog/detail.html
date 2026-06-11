@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ product.title }}{% endblock %}
+{% block content %}
+<div class="container page-content">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+        <a href="/catalog" class="back-link" style="margin-bottom:0">← Назад в каталог</a>
+        <button class="fav-btn {% if is_favorite %}fav-active{% endif %}" onclick="toggleFav({{ product.id }}, this)" title="В избранное">
+            {% if is_favorite %}❤️ В избранном{% else %}🤍 В избранное{% endif %}
+        </button>
+    </div>
+
+    <div class="product-detail">
+        <div class="product-gallery">
+            {% if product._photos_list %}
+            <div class="gallery-main">
+                <img id="main-img" src="{{ product._photos_list[0] }}" alt="{{ product.title }}"
+                     onerror="this.src='/static/img/no-photo.svg'">
+            </div>
+            {% if product._photos_list|length > 1 %}
+            <div class="gallery-thumbs">
+                {% for photo in product._photos_list %}
+                <img src="{{ photo }}" alt="Фото {{ loop.index }}"
+                     onclick="document.getElementById('main-img').src=this.src"
+                     onerror="this.style.display='none'"
+                     class="thumb {% if loop.first %}active{% endif %}">
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="no-photo-large">📷 Фото отсутствует</div>
+            {% endif %}
+        </div>
+
+        <div class="product-detail-info">
+            <h1 class="product-detail-title">{{ product.title }}</h1>
+
+            {% if product.article %}
+            <div class="detail-row"><span>Артикул:</span> <strong>{{ product.article }}</strong></div>
+            {% endif %}
+            {% if product.category %}
+            <div class="detail-row"><span>Категория:</span> {{ product.category }}</div>
+            {% endif %}
+            {% if product.availability %}
+            <div class="detail-row availability-row">
+                <span>Наличие:</span>
+                <span class="availability-badge">{{ product.availability }}</span>
+            </div>
+            {% endif %}
+
+            {% if product.price %}
+            <div class="product-detail-price">{{ "{:,.0f}".format(product.price) }} ₽</div>
+            {% else %}
+            <div class="product-detail-price no-price">Цена по запросу</div>
+            {% endif %}
+
+            {% if product.description %}
+            <div class="product-description">
+                <h3>Описание</h3>
+                <p>{{ product.description }}</p>
+            </div>
+            {% endif %}
+
+            {% if product._chars %}
+            <div class="product-chars">
+                <h3>Характеристики</h3>
+                <table class="chars-table">
+                    {% for key, val in product._chars.items() %}
+                    <tr>
+                        <td>{{ key }}</td>
+                        <td>{{ val }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endif %}
+
+            <div class="product-meta">
+                <small>Обновлено: {{ product.updated_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                {% if product.avito_url %}
+                <a href="{{ product.avito_url }}" target="_blank" class="avito-link">Смотреть на Avito →</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

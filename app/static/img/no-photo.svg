@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150">
+  <rect width="200" height="150" fill="#1a1d27"/>
+  <text x="100" y="80" text-anchor="middle" font-size="40" fill="#3a3f5c">📷</text>
+  <text x="100" y="110" text-anchor="middle" font-size="12" fill="#5a607a">Нет фото</text>
+</svg>

@@ -1,0 +1,26 @@
+{% extends "admin/base.html" %}
+{% block title %}Панель управления{% endblock %}
+{% block content %}
+<h1>Панель управления</h1>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-num">{{ users_count }}</div>
+        <div class="stat-label">Пользователей</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-num">{{ products_count }}</div>
+        <div class="stat-label">Товаров в каталоге</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-num">{% if last_sync %}{{ last_sync.finished_at.strftime('%d.%m') }}{% else %}—{% endif %}</div>
+        <div class="stat-label">Последняя синхронизация</div>
+    </div>
+</div>
+
+<div class="admin-links">
+    <a href="/admin/users" class="admin-link-card">👥 Пользователи</a>
+    <a href="/admin/videos" class="admin-link-card">🎬 Видео</a>
+    <a href="/admin/catalog" class="admin-link-card">📦 Каталог</a>
+</div>
+{% endblock %}

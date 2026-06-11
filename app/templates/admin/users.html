@@ -1,0 +1,55 @@
+{% extends "admin/base.html" %}
+{% block title %}Пользователи{% endblock %}
+{% block content %}
+<h1>Пользователи</h1>
+
+{% if new_pass_info %}
+<div class="alert alert-success">{{ new_pass_info }}</div>
+{% endif %}
+
+<div class="table-wrap">
+<table class="admin-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Логин</th>
+            <th>Telegram ID</th>
+            <th>Регистрация</th>
+            <th>Оплата</th>
+            <th>Доступ до</th>
+            <th>Статус</th>
+            <th>Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for user in users %}
+    <tr class="{% if not user.is_active %}row-disabled{% elif user.has_active_subscription %}row-active{% else %}row-expired{% endif %}">
+        <td>{{ user.id }}</td>
+        <td><code>{{ user.login }}</code></td>
+        <td>{{ user.telegram_id or '—' }}</td>
+        <td>{{ user.registered_at.strftime('%d.%m.%Y') }}</td>
+        <td>{{ user.last_paid_at.strftime('%d.%m.%Y') if user.last_paid_at else '—' }}</td>
+        <td>{{ user.access_until.strftime('%d.%m.%Y') if user.access_until else '—' }}</td>
+        <td>
+            {% if not user.is_active %}<span class="badge badge-red">Откл</span>
+            {% elif user.has_active_subscription %}<span class="badge badge-green">Активен</span>
+            {% else %}<span class="badge badge-gray">Истёк</span>{% endif %}
+        </td>
+        <td class="actions">
+            <form method="post" action="/admin/users/{{ user.id }}/extend" style="display:inline">
+                <button class="btn-sm btn-green" title="Продлить +30 дней">+30д</button>
+            </form>
+            <form method="post" action="/admin/users/{{ user.id }}/reset-password" style="display:inline">
+                <button class="btn-sm btn-blue" title="Сбросить пароль">🔑</button>
+            </form>
+            <form method="post" action="/admin/users/{{ user.id }}/disable" style="display:inline"
+                  onsubmit="return confirm('Отключить пользователя?')">
+                <button class="btn-sm btn-red" title="Отключить">✕</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

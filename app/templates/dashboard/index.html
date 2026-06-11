@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Личный кабинет{% endblock %}
+{% block content %}
+<div class="container page-content">
+    <h1 class="page-title">Личный кабинет</h1>
+
+    <div class="card status-card {% if user.has_active_subscription %}status-active{% else %}status-expired{% endif %}">
+        <div class="status-icon">{% if user.has_active_subscription %}✅{% else %}❌{% endif %}</div>
+        <div class="status-info">
+            {% if user.has_active_subscription %}
+            <div class="status-label">Доступ активен</div>
+            <div class="status-date">до {{ user.access_until.strftime('%d.%m.%Y') }}</div>
+            {% else %}
+            <div class="status-label">Доступ истёк</div>
+            <div class="status-date">Продлите подписку через Telegram-бот</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="info-row">
+        <span class="info-label">Логин:</span>
+        <span class="info-value"><code>{{ user.login }}</code></span>
+    </div>
+
+    <div class="dashboard-actions">
+        {% if user.has_active_subscription %}
+        <a href="/videos" class="btn btn-primary">▶️ Перейти к обучению</a>
+        {% else %}
+        <a href="https://t.me/Eurorazbor777_bot" class="btn btn-primary" target="_blank">🔄 Продлить подписку</a>
+        {% endif %}
+        <a href="/catalog" class="btn btn-secondary">📦 Каталог товаров</a>
+    </div>
+
+    {% if fav_products %}
+    <div class="dashboard-section">
+        <h2 class="section-title">❤️ Избранные товары</h2>
+        <div class="mini-grid">
+            {% for product in fav_products %}
+            <a href="/catalog/{{ product.id }}" class="mini-card">
+                <div class="mini-img">
+                    {% if product._photos_list %}
+                    <img src="{{ product._photos_list[0] }}" alt="{{ product.title }}" loading="lazy" onerror="this.src='/static/img/no-photo.svg'">
+                    {% else %}
+                    <div class="no-photo">📷</div>
+                    {% endif %}
+                </div>
+                <div class="mini-info">
+                    <div class="mini-title">{{ product.title[:40] }}{% if product.title|length > 40 %}…{% endif %}</div>
+                    {% if product.price %}
+                    <div class="mini-price">{{ "{:,.0f}".format(product.price) }} ₽</div>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if fav_videos %}
+    <div class="dashboard-section">
+        <h2 class="section-title">🎬 Избранные видео</h2>
+        <div class="fav-videos-list">
+            {% for video in fav_videos %}
+            <a href="/videos" class="fav-video-item">
+                <span class="fav-video-num">Урок {{ loop.index }}</span>
+                <span class="fav-video-title">{{ video.title }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if history %}
+    <div class="dashboard-section">
+        <h2 class="section-title">🕐 История просмотров</h2>
+        <div class="mini-grid">
+            {% for product, viewed_at in history %}
+            <a href="/catalog/{{ product.id }}" class="mini-card">
+                <div class="mini-img">
+                    {% if product._photos_list %}
+                    <img src="{{ product._photos_list[0] }}" alt="{{ product.title }}" loading="lazy" onerror="this.src='/static/img/no-photo.svg'">
+                    {% else %}
+                    <div class="no-photo">📷</div>
+                    {% endif %}
+                </div>
+                <div class="mini-info">
+                    <div class="mini-title">{{ product.title[:40] }}{% if product.title|length > 40 %}…{% endif %}</div>
+                    <div class="mini-date">{{ viewed_at.strftime('%d.%m %H:%M') }}</div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

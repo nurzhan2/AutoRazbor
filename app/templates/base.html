@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}EuroRazbor{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="icon" href="/static/img/favicon.ico" type="image/x-icon">
+    {% block head %}{% endblock %}
+</head>
+<body>
+{% if user is defined and user %}
+<nav class="navbar">
+    <div class="container nav-inner">
+        <a class="logo" href="/dashboard">
+            <img src="/static/img/logo.jpg" alt="EuroRazbor">
+            <span class="logo-text">EuroRazbor</span>
+        </a>
+        <div class="nav-links">
+            <a href="/dashboard" {% if request.url.path == '/dashboard' %}class="active"{% endif %}>Кабинет</a>
+            <a href="/videos" {% if request.url.path == '/videos' %}class="active"{% endif %}>Обучение</a>
+            <a href="/catalog" {% if '/catalog' in request.url.path %}class="active"{% endif %}>Каталог</a>
+            <a href="/logout" class="btn-logout">Выйти</a>
+        </div>
+    </div>
+</nav>
+{% endif %}
+<main class="{% if user is defined and user %}has-nav{% endif %}">
+    {% block content %}{% endblock %}
+</main>
+<script src="/static/js/main.js"></script>
+</body>
+</html>

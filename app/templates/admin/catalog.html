@@ -1,0 +1,65 @@
+{% extends "admin/base.html" %}
+{% block title %}Каталог{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+    <h1 style="margin:0">Каталог товаров</h1>
+    <form method="post" action="/admin/catalog/sync">
+        <button class="btn btn-primary">🔄 Обновить сейчас</button>
+    </form>
+</div>
+
+{% if request.query_params.get('syncing') %}
+<div class="alert alert-success">Синхронизация запущена. Обновите страницу через минуту.</div>
+{% endif %}
+
+<h3>Последние синхронизации</h3>
+<div class="table-wrap" style="margin-bottom:32px;">
+<table class="admin-table">
+    <thead><tr><th>Начало</th><th>Конец</th><th>Статус</th><th>+</th><th>~</th><th>-</th><th>Ошибка</th></tr></thead>
+    <tbody>
+    {% for log in logs %}
+    <tr>
+        <td>{{ log.started_at.strftime('%d.%m.%Y %H:%M') }}</td>
+        <td>{{ log.finished_at.strftime('%H:%M:%S') if log.finished_at else '—' }}</td>
+        <td>
+            {% if log.status == 'success' %}<span class="badge badge-green">OK</span>
+            {% elif log.status == 'error' %}<span class="badge badge-red">Ошибка</span>
+            {% else %}<span class="badge badge-gray">Запущен</span>{% endif %}
+        </td>
+        <td>{{ log.products_added }}</td>
+        <td>{{ log.products_updated }}</td>
+        <td>{{ log.products_removed }}</td>
+        <td style="max-width:200px;font-size:12px;">{{ log.error_message or '—' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<h3>Товары (последние 50)</h3>
+<div class="table-wrap">
+<table class="admin-table">
+    <thead><tr><th>ID</th><th>Название</th><th>Арт.</th><th>Цена</th><th>Категория</th><th>Обновлён</th><th>Статус</th><th>Действия</th></tr></thead>
+    <tbody>
+    {% for p in products %}
+    <tr class="{% if not p.is_active %}row-disabled{% endif %}">
+        <td>{{ p.id }}</td>
+        <td>{{ p.title[:40] }}{% if p.title|length > 40 %}…{% endif %}</td>
+        <td>{{ p.article or '—' }}</td>
+        <td>{% if p.price %}{{ "{:,.0f}".format(p.price) }} ₽{% else %}—{% endif %}</td>
+        <td>{{ p.category or '—' }}</td>
+        <td>{{ p.updated_at.strftime('%d.%m %H:%M') }}</td>
+        <td>{% if p.is_active %}<span class="badge badge-green">Акт.</span>{% else %}<span class="badge badge-red">Скрыт</span>{% endif %}</td>
+        <td>
+            {% if p.is_active %}
+            <form method="post" action="/admin/catalog/{{ p.id }}/hide" style="display:inline">
+                <button class="btn-sm btn-red">Скрыть</button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}
