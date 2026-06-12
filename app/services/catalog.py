@@ -291,6 +291,16 @@ def parse_avito_xml_ad(ad) -> dict:
     spare_part_type = get("SparePartType")
     oem = get("OEM")
 
+    # Granular part name (Узел/деталь), e.g. <BodySparePartType>Бампер</BodySparePartType>,
+    # <SuspensionSparePartType>Рычаг</SuspensionSparePartType>, etc.
+    part_name = None
+    for child in ad:
+        tag = child.tag
+        if isinstance(tag, str) and tag.endswith("SparePartType") and tag != "SparePartType":
+            if child.text and child.text.strip():
+                part_name = child.text.strip()
+                break
+
     return {
         "external_id": ext_id,
         "title": get("Title"),
@@ -306,6 +316,7 @@ def parse_avito_xml_ad(ad) -> dict:
         "model": model,
         "generation": generation,
         "spare_part_type": spare_part_type,
+        "part_name": part_name,
         "oem": oem,
     }
 
@@ -422,6 +433,7 @@ async def update_catalog(items) -> tuple[int, int, int]:
                     p.model = item.get("model") or p.model
                     p.generation = item.get("generation") or p.generation
                     p.spare_part_type = item.get("spare_part_type") or p.spare_part_type
+                    p.part_name = item.get("part_name") or p.part_name
                     p.oem = item.get("oem") or p.oem
                     p.is_active = True
                     p.updated_at = now
@@ -442,6 +454,7 @@ async def update_catalog(items) -> tuple[int, int, int]:
                         model=item.get("model"),
                         generation=item.get("generation"),
                         spare_part_type=item.get("spare_part_type"),
+                        part_name=item.get("part_name"),
                         oem=item.get("oem"),
                         is_active=True,
                         updated_at=now,

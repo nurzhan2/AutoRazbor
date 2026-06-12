@@ -63,6 +63,7 @@ class Product(Base):
     model = Column(String, nullable=True, index=True)           # Модель
     generation = Column(String, nullable=True, index=True)      # Поколение
     spare_part_type = Column(String, nullable=True, index=True)  # Категория запчастей
+    part_name = Column(String, nullable=True, index=True)        # Узел/деталь (Бампер, Капот, Рычаг...)
     oem = Column(String, nullable=True, index=True)             # Оригинальный номер
 
 
