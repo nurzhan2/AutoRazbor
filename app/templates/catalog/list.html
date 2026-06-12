@@ -9,6 +9,31 @@
         {% endif %}
     </div>
 
+    <div class="categories-section">
+        <h2 class="brands-title">Популярные категории</h2>
+        <div class="categories-grid">
+            {% for cat_label, cat_search, cat_img in [
+                ('Шины', 'шины', 'Шины.png'),
+                ('Диски', 'диски', 'Диски.png'),
+                ('АКПП', 'АКПП', 'АКПП.png'),
+                ('МКПП', 'МКПП', 'МКПП.png'),
+                ('Турбины', 'турбина', 'Турбины.png'),
+                ('Двигатели', 'двигатель', 'Двигатели.png'),
+                ('Фары', 'фара', 'Фары.png'),
+                ('Фонари', 'фонарь', 'Фонари.png'),
+                ('Капоты', 'капот', 'Капоты.png'),
+                ('Рулевые рейки', 'рулевая рейка', 'Рулевые рейки.png'),
+                ('Бамперы', 'бампер', 'Бампера.png'),
+                ('Рычаги', 'рычаг', 'Рычаги.png'),
+            ] %}
+            <a href="/catalog?search={{ cat_search }}" class="category-card">
+                <span>{{ cat_label }}</span>
+                <img src="/static/img/autoparts/{{ cat_img }}" alt="{{ cat_label }}" loading="lazy">
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
     <div class="brands-section">
         <h2 class="brands-title">Подбор по марке авто</h2>
         <div class="brands-grid">

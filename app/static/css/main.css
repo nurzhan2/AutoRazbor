@@ -248,3 +248,26 @@ select option { background: var(--surface); }
   .brand-card { height: 70px; padding: 8px 10px; }
   .brand-card span { font-size: 11px; }
 }
+
+/* PARTS CATEGORY GRID (carro.by-style top categories) */
+.categories-section { margin-bottom: 28px; }
+.categories-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.category-card {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px; min-height: 70px;
+  color: var(--text); transition: all .15s; gap: 8px;
+}
+.category-card:hover { border-color: #ccc; box-shadow: 0 4px 16px rgba(0,0,0,.08); transform: translateY(-2px); }
+.category-card span { font-size: 14px; font-weight: 700; line-height: 1.25; }
+.category-card img { height: 56px; max-width: 90px; object-fit: contain; flex-shrink: 0; }
+
+@media (max-width: 1024px) {
+  .categories-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 600px) {
+  .categories-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .category-card { padding: 10px 12px; min-height: 56px; }
+  .category-card span { font-size: 12px; }
+  .category-card img { height: 40px; max-width: 60px; }
+}
