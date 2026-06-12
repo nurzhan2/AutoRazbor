@@ -58,29 +58,39 @@ async def catalog(
             "диск": "диск", "тормоз": "тормоз", "подвеска": "подвеск",
         }
         search_lower = search.lower()
-        for ru, en in translit.items():
-            search_lower = search_lower.replace(ru, en)
-
         words = [w.strip() for w in search_lower.split() if len(w.strip()) >= 2]
+
         for word in words:
-            # AND between words, OR between fields
-            query = query.where(
-                or_(
-                    Product.title.ilike(f"%{word}%"),
-                    Product.article.ilike(f"%{word}%"),
-                    Product.description.ilike(f"%{word}%"),
-                )
-            )
+            # Build variants: original word + transliterated version (if different)
+            variants = {word}
+            translated = word
+            for ru, en in translit.items():
+                translated = translated.replace(ru, en)
+            variants.add(translated)
+
+            conditions = []
+            for variant in variants:
+                conditions.extend([
+                    Product.title.ilike(f"%{variant}%"),
+                    Product.article.ilike(f"%{variant}%"),
+                    Product.description.ilike(f"%{variant}%"),
+                ])
+            # AND between words, OR between variants/fields
+            query = query.where(or_(*conditions))
     if category:
         query = query.where(Product.category == category)
-    if min_price:
+    if min_price.strip():
         try:
-            query = query.where(Product.price >= float(min_price))
+            mp = float(min_price)
+            if mp > 0:
+                query = query.where(Product.price >= mp)
         except ValueError:
             pass
-    if max_price:
+    if max_price.strip():
         try:
-            query = query.where(Product.price <= float(max_price))
+            mxp = float(max_price)
+            if mxp > 0:
+                query = query.where(Product.price <= mxp)
         except ValueError:
             pass
 
