@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import resource
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -32,11 +33,13 @@ async def run_catalog_sync(feed_url: Optional[str] = None) -> SyncLog:
         await db.commit()
         await db.refresh(log)
 
+        feed_path = None
         try:
             logger.info(f"[SYNC] start, mem={_mem_mb():.1f}MB")
-            content = await fetch_feed(url)
-            logger.info(f"[SYNC] fetched {len(content)/1024:.1f}KB, mem={_mem_mb():.1f}MB")
-            items = parse_feed(content)
+            feed_path = await fetch_feed(url)
+            size_kb = os.path.getsize(feed_path) / 1024
+            logger.info(f"[SYNC] fetched {size_kb:.1f}KB to disk, mem={_mem_mb():.1f}MB")
+            items = parse_feed(feed_path)
             logger.info(f"[SYNC] feed parser ready, mem={_mem_mb():.1f}MB")
 
             added, updated, removed = await update_catalog(items)
@@ -62,62 +65,108 @@ async def run_catalog_sync(feed_url: Optional[str] = None) -> SyncLog:
             logger.error(f"Sync failed: {e}")
             await notify_admin_sync_error(str(e))
 
+        finally:
+            if feed_path:
+                try:
+                    os.remove(feed_path)
+                except OSError:
+                    pass
+
         return log
 
 
-async def fetch_feed(url: str) -> bytes:
+async def fetch_feed(url: str) -> str:
+    """Stream the feed to a temp file on disk and return its path.
+
+    Avito/carrobiz feeds can be 100+ MB (especially the XML format).
+    Streaming to disk keeps memory usage flat regardless of feed size.
+    """
     if not url:
         raise ValueError("AVITO_FEED_URL not configured")
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "*/*",
     }
-    async with httpx.AsyncClient(timeout=60, headers=headers) as client:
-        response = await client.get(url, follow_redirects=True)
-        response.raise_for_status()
-        if len(response.content) < 10:
-            raise ValueError("Feed is empty")
-        return response.content
+    tmp_path = f"/tmp/feed_{os.getpid()}_{int(time.time())}.dat"
+    total = 0
+    async with httpx.AsyncClient(timeout=180, headers=headers) as client:
+        async with client.stream("GET", url, follow_redirects=True) as response:
+            response.raise_for_status()
+            with open(tmp_path, "wb") as f:
+                async for chunk in response.aiter_bytes(chunk_size=1 << 16):
+                    f.write(chunk)
+                    total += len(chunk)
+
+    if total < 10:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise ValueError("Feed is empty")
+
+    return tmp_path
 
 
-def parse_feed(content: bytes):
-    """Parse XML/YML/CSV/XLS/XLSX Avito feed. Returns an iterator/generator of product dicts."""
+def parse_feed(path: str):
+    """Parse XML/YML/CSV/XLS/XLSX Avito feed from a file path.
+    Returns an iterator/generator of product dicts. All parsers stream
+    from disk so memory stays flat regardless of feed size.
+    """
+    with open(path, "rb") as f:
+        header = f.read(8)
+
     # Detect XLS/XLSX by magic bytes
-    if (content[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1') or content[:2] == b'PK':
-        return parse_xls_feed(content)
+    if header[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1' or header[:2] == b'PK':
+        return parse_xls_feed(path)
 
-    # Try XML
-    try:
-        root = etree.fromstring(content)
-    except etree.XMLSyntaxError:
-        if b'\xd0\xcf\x11\xe0' in content[:8] or content[:4] == b'PK\x03\x04':
-            return parse_xls_feed(content)
-        return parse_csv_feed(content)
+    # Peek further to detect XML (skip BOM/whitespace)
+    with open(path, "rb") as f:
+        start = f.read(4096).lstrip(b"\xef\xbb\xbf \t\r\n")
 
-    items = []
-    # Support standard Avito XML and YML (Yandex Market) formats
-    for ad in root.iter("Ad"):
-        items.append(parse_avito_xml_ad(ad))
-    if not items:
-        # YML format
-        for offer in root.iter("offer"):
-            items.append(parse_yml_offer(offer))
-    if not items:
+    if start.startswith(b"<"):
+        return parse_xml_feed(path)
+
+    return parse_csv_feed(path)
+
+
+def parse_xml_feed(path: str):
+    """Stream-parse a large Avito/YML XML feed using iterparse.
+
+    Crucially, this never builds the full DOM tree in memory - each
+    <Ad>/<offer> element is processed and then cleared, along with all
+    its preceding siblings, keeping memory usage flat even for 100+MB feeds.
+    """
+    found_any = False
+    context = etree.iterparse(path, events=("end",), tag=("Ad", "offer"))
+    for _, elem in context:
+        found_any = True
+        if elem.tag == "Ad":
+            yield parse_avito_xml_ad(elem)
+        else:
+            yield parse_yml_offer(elem)
+
+        # Free memory: clear this element and drop earlier siblings/parents data
+        elem.clear()
+        while elem.getprevious() is not None:
+            del elem.getparent()[0]
+
+    del context
+
+    if not found_any:
         raise ValueError("No items found in feed. Check feed format.")
-    return iter(items)
 
 
-def parse_xls_feed(content: bytes):
+def parse_xls_feed(path: str):
     """Parse XLS/XLSX Avito export file as a generator (memory efficient).
 
     Uses python-calamine (Rust-based) which is much more memory efficient
     than xlrd/openpyxl for large legacy .xls files - it streams rows as
-    plain Python lists without per-cell wrapper objects.
+    plain Python lists without per-cell wrapper objects. Reading directly
+    from a file path avoids holding the raw bytes in Python memory too.
     """
-    import io
     from python_calamine import CalamineWorkbook
 
-    wb = CalamineWorkbook.from_object(io.BytesIO(content))
+    wb = CalamineWorkbook.from_path(path)
     sheet = wb.get_sheet_by_index(0)
 
     headers = None
@@ -255,26 +304,24 @@ def parse_yml_offer(offer) -> dict:
     }
 
 
-def parse_csv_feed(content: bytes) -> list[dict]:
+def parse_csv_feed(path: str):
     import csv
-    import io
-    text = content.decode("utf-8-sig", errors="replace")
-    reader = csv.DictReader(io.StringIO(text))
-    items = []
-    for row in reader:
-        items.append({
-            "external_id": row.get("Id") or row.get("id"),
-            "title": row.get("Title") or row.get("Название"),
-            "description": row.get("Description") or row.get("Описание"),
-            "price": _parse_price(row.get("Price") or row.get("Цена")),
-            "photos": json.dumps([row.get("ImageUrls", "")]),
-            "characteristics": json.dumps({}),
-            "category": row.get("Category") or row.get("Категория"),
-            "article": row.get("Article") or row.get("Артикул"),
-            "avito_url": row.get("Url"),
-            "availability": row.get("Availability", "в наличии"),
-        })
-    return items
+
+    with open(path, "r", encoding="utf-8-sig", errors="replace", newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            yield {
+                "external_id": row.get("Id") or row.get("id"),
+                "title": row.get("Title") or row.get("Название"),
+                "description": row.get("Description") or row.get("Описание"),
+                "price": _parse_price(row.get("Price") or row.get("Цена")),
+                "photos": json.dumps([row.get("ImageUrls", "")]),
+                "characteristics": json.dumps({}),
+                "category": row.get("Category") or row.get("Категория"),
+                "article": row.get("Article") or row.get("Артикул"),
+                "avito_url": row.get("Url"),
+                "availability": row.get("Availability", "в наличии"),
+            }
 
 
 def _parse_price(value) -> Optional[float]:
