@@ -220,20 +220,29 @@ select option { background: var(--surface); }
 .brands-title { font-size: 18px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 14px; }
 .brands-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; }
 .brand-card {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 8px; background: var(--surface2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 14px 8px; color: var(--text);
-  transition: all .15s; text-align: center;
+  position: relative; display: flex; align-items: flex-start; justify-content: flex-start;
+  height: 90px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px; color: var(--text);
+  overflow: hidden; transition: all .15s;
 }
 .brand-card:hover { border-color: #ccc; box-shadow: 0 4px 16px rgba(0,0,0,.08); transform: translateY(-2px); }
-.brand-card img { width: 40px; height: 40px; object-fit: contain; }
-.brand-card span { font-size: 12px; font-weight: 600; }
+.brand-card span {
+  position: relative; z-index: 2; font-size: 13px; font-weight: 700;
+}
+.brand-card img {
+  position: absolute; top: 0; height: 100%; width: 75%;
+  object-fit: cover; opacity: .92; z-index: 1;
+}
+/* Car image bleeds off the right edge of the card */
+.brand-card.peek-right img { right: -15%; left: auto; object-position: left center; }
+/* Car image bleeds off the left edge of the card */
+.brand-card.peek-left img { left: -15%; right: auto; object-position: right center; }
 
 @media (max-width: 1024px) {
   .brands-grid { grid-template-columns: repeat(5, 1fr); }
 }
 @media (max-width: 600px) {
   .brands-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .brand-card img { width: 32px; height: 32px; }
+  .brand-card { height: 70px; padding: 8px 10px; }
   .brand-card span { font-size: 11px; }
 }

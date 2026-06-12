@@ -12,29 +12,29 @@
     <div class="brands-section">
         <h2 class="brands-title">Подбор по марке авто</h2>
         <div class="brands-grid">
-            {% for brand_label, brand_search, brand_img in [
-                ('Audi', 'Audi', 'audi.png'),
-                ('BMW', 'BMW', 'bmw.png'),
-                ('Ford', 'Ford', 'ford.png'),
-                ('Geely', 'Geely', 'gelly.png'),
-                ('Haval', 'Haval', 'haval.png'),
-                ('Honda', 'Honda', 'honda.png'),
-                ('Hyundai', 'Hyundai', 'hundai.png'),
-                ('Kia', 'Kia', 'kia.png'),
-                ('Lexus', 'Lexus', 'lexus.png'),
-                ('Mazda', 'Mazda', 'mazda.png'),
-                ('Mercedes-Benz', 'Mercedes', 'mercedes.png'),
-                ('Mitsubishi', 'Mitsubishi', 'mitsubishi.png'),
-                ('Nissan', 'Nissan', 'nissan.png'),
-                ('Opel', 'Opel', 'opel.png'),
-                ('Peugeot', 'Peugeot', 'peugeot.png'),
-                ('Renault', 'Renault', 'reno.png'),
-                ('Skoda', 'Skoda', 'skoda.png'),
-                ('Toyota', 'Toyota', 'toyota.png'),
-                ('Volkswagen', 'Volkswagen', 'Wolswagen.png'),
-                ('Volvo', 'Volvo', 'volvo.png'),
+            {% for brand_label, brand_search, brand_img, peek in [
+                ('Audi', 'Audi', 'audi.png', 'right'),
+                ('BMW', 'BMW', 'bmw.png', 'right'),
+                ('Ford', 'Ford', 'ford.png', 'right'),
+                ('Geely', 'Geely', 'gelly.png', 'right'),
+                ('Haval', 'Haval', 'haval.png', 'right'),
+                ('Honda', 'Honda', 'honda.png', 'right'),
+                ('Hyundai', 'Hyundai', 'hundai.png', 'right'),
+                ('Kia', 'Kia', 'kia.png', 'right'),
+                ('Lexus', 'Lexus', 'lexus.png', 'right'),
+                ('Mazda', 'Mazda', 'mazda.png', 'right'),
+                ('Mercedes-Benz', 'Mercedes', 'mercedes.png', 'right'),
+                ('Mitsubishi', 'Mitsubishi', 'mitstubishi.png', 'right'),
+                ('Nissan', 'Nissan', 'nissan.png', 'right'),
+                ('Opel', 'Opel', 'opel.png', 'left'),
+                ('Peugeot', 'Peugeot', 'peugeot.png', 'right'),
+                ('Renault', 'Renault', 'reno.png', 'right'),
+                ('Skoda', 'Skoda', 'skoda.png', 'right'),
+                ('Toyota', 'Toyota', 'toyota.png', 'left'),
+                ('Volkswagen', 'Volkswagen', 'Wolswagen.png', 'right'),
+                ('Volvo', 'Volvo', 'volvo.png', 'left'),
             ] %}
-            <a href="/catalog?search={{ brand_search }}" class="brand-card">
+            <a href="/catalog?search={{ brand_search }}" class="brand-card peek-{{ peek }}">
                 <img src="/static/img/brands/{{ brand_img }}" alt="{{ brand_label }}" loading="lazy">
                 <span>{{ brand_label }}</span>
             </a>
