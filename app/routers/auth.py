@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.models.database import get_db
 from app.services.auth import authenticate_user, create_access_token, decode_token
 
@@ -18,10 +17,19 @@ def get_current_user_from_cookie(request: Request):
 
 
 @router.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
+async def login_page(request: Request, db: AsyncSession = Depends(get_db)):
     token_data = get_current_user_from_cookie(request)
     if token_data:
-        return RedirectResponse("/dashboard", status_code=302)
+        from sqlalchemy import select
+        from app.models.models import User
+        result = await db.execute(select(User).where(User.id == token_data["user_id"]))
+        user = result.scalar_one_or_none()
+        if user and user.is_active:
+            return RedirectResponse("/dashboard", status_code=302)
+        # Stale/invalid cookie (e.g. DB was reset) - clear it and show login form
+        response = templates.TemplateResponse("auth/login.html", {"request": request, "error": None})
+        response.delete_cookie("access_token")
+        return response
     return templates.TemplateResponse("auth/login.html", {"request": request, "error": None})
 
 
