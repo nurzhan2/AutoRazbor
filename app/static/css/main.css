@@ -271,3 +271,9 @@ select option { background: var(--surface); }
   .category-card span { font-size: 11px; }
   .category-card img { height: 30px; max-width: 46px; }
 }
+
+/* Active state for quick-filter buttons (category/brand grids) */
+.category-card.active, .brand-card.active {
+  border-color: var(--primary, #1a1a1a);
+  box-shadow: 0 0 0 2px var(--primary, #1a1a1a) inset;
+}

@@ -26,7 +26,9 @@
                 ('Бамперы', 'бампер', 'Бампера.png'),
                 ('Рычаги', 'рычаг', 'Рыччаги.png'),
             ] %}
-            <a href="/catalog?search={{ cat_search }}" class="category-card">
+            {% set is_active = (search == cat_search) %}
+            <a href="/catalog?search={% if is_active %}{% else %}{{ cat_search }}{% endif %}{% if make %}&make={{ make }}{% endif %}"
+               class="category-card{% if is_active %} active{% endif %}">
                 <span>{{ cat_label }}</span>
                 <img src="/static/img/autoparts/{{ cat_img }}" alt="{{ cat_label }}" loading="lazy">
             </a>
@@ -37,7 +39,7 @@
     <div class="brands-section">
         <h2 class="brands-title">Подбор по марке авто</h2>
         <div class="brands-grid">
-            {% for brand_label, brand_search, brand_img, peek in [
+            {% for brand_label, brand_make, brand_img, peek in [
                 ('Audi', 'Audi', 'audi.png', 'right'),
                 ('BMW', 'BMW', 'bmw.png', 'right'),
                 ('Ford', 'Ford', 'ford.png', 'right'),
@@ -48,7 +50,7 @@
                 ('Kia', 'Kia', 'kia.png', 'right'),
                 ('Lexus', 'Lexus', 'lexus.png', 'right'),
                 ('Mazda', 'Mazda', 'mazda.png', 'right'),
-                ('Mercedes-Benz', 'Mercedes', 'mercedes.png', 'right'),
+                ('Mercedes-Benz', 'Mercedes-Benz', 'mercedes.png', 'right'),
                 ('Mitsubishi', 'Mitsubishi', 'mitstubishi.png', 'right'),
                 ('Nissan', 'Nissan', 'nissan.png', 'right'),
                 ('Opel', 'Opel', 'opel.png', 'left'),
@@ -59,7 +61,9 @@
                 ('Volkswagen', 'Volkswagen', 'Wolswagen.png', 'right'),
                 ('Volvo', 'Volvo', 'volvo.png', 'left'),
             ] %}
-            <a href="/catalog?search={{ brand_search }}" class="brand-card peek-{{ peek }}">
+            {% set is_active = (make == brand_make) %}
+            <a href="/catalog?make={% if is_active %}{% else %}{{ brand_make }}{% endif %}{% if search %}&search={{ search }}{% endif %}"
+               class="brand-card peek-{{ peek }}{% if is_active %} active{% endif %}">
                 <img src="/static/img/brands/{{ brand_img }}" alt="{{ brand_label }}" loading="lazy">
                 <span>{{ brand_label }}</span>
             </a>
@@ -99,10 +103,17 @@
 
         <div class="filter-section-label">Категория запчастей</div>
         <div class="filter-row">
-            <select name="spare_part_type">
+            <select name="spare_part_type"
+                    onchange="document.querySelector('[name=part_name]').value='';this.form.submit()">
                 <option value="">Все категории</option>
                 {% for s in spare_part_types %}
                 <option value="{{ s }}" {% if spare_part_type == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+            </select>
+            <select name="part_name">
+                <option value="">Деталь/узел (все)</option>
+                {% for pn in part_names %}
+                <option value="{{ pn }}" {% if part_name == pn %}selected{% endif %}>{{ pn }}</option>
                 {% endfor %}
             </select>
             <input type="number" name="min_price" value="{{ min_price }}" placeholder="Цена от">
@@ -113,7 +124,7 @@
                 <option value="price_desc" {% if sort == 'price_desc' %}selected{% endif %}>Цена ↓</option>
             </select>
             <button type="submit" class="btn btn-primary">Найти</button>
-            {% if search or make or model or generation or spare_part_type or oem or min_price or max_price %}
+            {% if search or make or model or generation or spare_part_type or part_name or oem or min_price or max_price %}
             <a href="/catalog" class="btn btn-secondary">Сбросить</a>
             {% endif %}
         </div>
@@ -152,7 +163,7 @@
     </div>
 
     {% if total_pages > 1 %}
-    {% set params = "search=" ~ search ~ "&make=" ~ make ~ "&model=" ~ model ~ "&generation=" ~ generation ~ "&spare_part_type=" ~ spare_part_type ~ "&oem=" ~ oem ~ "&min_price=" ~ min_price ~ "&max_price=" ~ max_price ~ "&sort=" ~ sort %}
+    {% set params = "search=" ~ search ~ "&make=" ~ make ~ "&model=" ~ model ~ "&generation=" ~ generation ~ "&spare_part_type=" ~ spare_part_type ~ "&part_name=" ~ part_name ~ "&oem=" ~ oem ~ "&min_price=" ~ min_price ~ "&max_price=" ~ max_price ~ "&sort=" ~ sort %}
     <div class="pagination">
         {% if page > 1 %}
         <a href="?page=1&{{ params }}" class="page-btn page-btn-arrow" title="Первая">«</a>

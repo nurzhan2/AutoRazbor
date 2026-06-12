@@ -25,6 +25,7 @@ async def catalog(
     model: str = "",
     generation: str = "",
     spare_part_type: str = "",
+    part_name: str = "",
     oem: str = "",
     category: str = "",
     min_price: str = "",
@@ -85,13 +86,15 @@ async def catalog(
 
     # Structured carro.by-style filters
     if make:
-        query = query.where(Product.make == make)
+        query = query.where(Product.make.ilike(make))
     if model:
         query = query.where(Product.model == model)
     if generation:
         query = query.where(Product.generation == generation)
     if spare_part_type:
         query = query.where(Product.spare_part_type == spare_part_type)
+    if part_name:
+        query = query.where(Product.part_name == part_name)
     if oem.strip():
         oem_term = oem.strip()
         query = query.where(
@@ -181,6 +184,15 @@ async def catalog(
     )
     spare_part_types = [r[0] for r in spt_result.fetchall()]
 
+    # Узел/деталь (granular sub-category, e.g. Бампер, Капот, Рычаг)
+    part_query = select(Product.part_name).distinct().where(
+        Product.is_active == True, Product.part_name != None, Product.part_name != ""
+    )
+    if spare_part_type:
+        part_query = part_query.where(Product.spare_part_type == spare_part_type)
+    part_result = await db.execute(part_query.order_by(Product.part_name))
+    part_names = [r[0] for r in part_result.fetchall()]
+
     # Legacy category dropdown (kept for backward compatibility)
     cat_result = await db.execute(
         select(Product.category).distinct().where(Product.is_active == True, Product.category != None)
@@ -206,6 +218,8 @@ async def catalog(
             "model": model,
             "generation": generation,
             "spare_part_type": spare_part_type,
+            "part_name": part_name,
+            "part_names": part_names,
             "oem": oem,
             "category": category,
             "min_price": min_price,
