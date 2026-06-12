@@ -228,6 +228,8 @@ select option { background: var(--surface); }
 .brand-card:hover { border-color: #ccc; box-shadow: 0 4px 16px rgba(0,0,0,.08); transform: translateY(-2px); }
 .brand-card span {
   position: relative; z-index: 2; font-size: 13px; font-weight: 700;
+  background: rgba(255,255,255,.88); padding: 3px 8px; border-radius: 6px;
+  backdrop-filter: blur(2px);
 }
 .brand-card img {
   position: absolute; top: 0; height: 100%; width: 75%;
