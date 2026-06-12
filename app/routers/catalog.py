@@ -21,6 +21,11 @@ async def catalog(
     request: Request,
     db: AsyncSession = Depends(get_db),
     search: str = "",
+    make: str = "",
+    model: str = "",
+    generation: str = "",
+    spare_part_type: str = "",
+    oem: str = "",
     category: str = "",
     min_price: str = "",
     max_price: str = "",
@@ -77,6 +82,26 @@ async def catalog(
                 ])
             # AND between words, OR between variants/fields
             query = query.where(or_(*conditions))
+
+    # Structured carro.by-style filters
+    if make:
+        query = query.where(Product.make == make)
+    if model:
+        query = query.where(Product.model == model)
+    if generation:
+        query = query.where(Product.generation == generation)
+    if spare_part_type:
+        query = query.where(Product.spare_part_type == spare_part_type)
+    if oem.strip():
+        oem_term = oem.strip()
+        query = query.where(
+            or_(
+                Product.oem.ilike(f"%{oem_term}%"),
+                Product.article.ilike(f"%{oem_term}%"),
+                Product.description.ilike(f"%{oem_term}%"),
+            )
+        )
+
     if category:
         query = query.where(Product.category == category)
     if min_price.strip():
@@ -118,7 +143,45 @@ async def catalog(
         except Exception:
             p._photos_list = []
 
-    # Categories for filter
+    # --- Dropdown options for carro.by-style filter form ---
+
+    # Марка (brand) - all active products
+    make_result = await db.execute(
+        select(Product.make).distinct()
+        .where(Product.is_active == True, Product.make != None, Product.make != "")
+        .order_by(Product.make)
+    )
+    makes = [r[0] for r in make_result.fetchall()]
+
+    # Модель - depends on selected Марка
+    model_query = select(Product.model).distinct().where(
+        Product.is_active == True, Product.model != None, Product.model != ""
+    )
+    if make:
+        model_query = model_query.where(Product.make == make)
+    model_result = await db.execute(model_query.order_by(Product.model))
+    models = [r[0] for r in model_result.fetchall()]
+
+    # Поколение - depends on selected Марка + Модель
+    gen_query = select(Product.generation).distinct().where(
+        Product.is_active == True, Product.generation != None, Product.generation != ""
+    )
+    if make:
+        gen_query = gen_query.where(Product.make == make)
+    if model:
+        gen_query = gen_query.where(Product.model == model)
+    gen_result = await db.execute(gen_query.order_by(Product.generation))
+    generations = [r[0] for r in gen_result.fetchall()]
+
+    # Категория запчастей
+    spt_result = await db.execute(
+        select(Product.spare_part_type).distinct()
+        .where(Product.is_active == True, Product.spare_part_type != None, Product.spare_part_type != "")
+        .order_by(Product.spare_part_type)
+    )
+    spare_part_types = [r[0] for r in spt_result.fetchall()]
+
+    # Legacy category dropdown (kept for backward compatibility)
     cat_result = await db.execute(
         select(Product.category).distinct().where(Product.is_active == True, Product.category != None)
     )
@@ -139,10 +202,19 @@ async def catalog(
             "user": user,
             "products": products,
             "search": search,
+            "make": make,
+            "model": model,
+            "generation": generation,
+            "spare_part_type": spare_part_type,
+            "oem": oem,
             "category": category,
             "min_price": min_price,
             "max_price": max_price,
             "sort": sort,
+            "makes": makes,
+            "models": models,
+            "generations": generations,
+            "spare_part_types": spare_part_types,
             "categories": categories,
             "page": page,
             "total_pages": total_pages,

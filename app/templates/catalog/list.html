@@ -12,10 +12,39 @@
     <form method="get" action="/catalog" class="filter-form">
         <div class="filter-row">
             <input type="text" name="search" value="{{ search }}" placeholder="Поиск по названию или артикулу...">
-            <select name="category">
+            <input type="text" name="oem" value="{{ oem }}" placeholder="Оригинальный номер (OEM)">
+        </div>
+
+        <div class="filter-section-label">Параметры авто</div>
+        <div class="filter-row">
+            <select name="make"
+                    onchange="document.querySelector('[name=model]').value='';document.querySelector('[name=generation]').value='';this.form.submit()">
+                <option value="">Марка (все)</option>
+                {% for m in makes %}
+                <option value="{{ m }}" {% if make == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+            <select name="model"
+                    onchange="document.querySelector('[name=generation]').value='';this.form.submit()">
+                <option value="">Модель (все)</option>
+                {% for m in models %}
+                <option value="{{ m }}" {% if model == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+            <select name="generation">
+                <option value="">Поколение (все)</option>
+                {% for g in generations %}
+                <option value="{{ g }}" {% if generation == g %}selected{% endif %}>{{ g }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-section-label">Категория запчастей</div>
+        <div class="filter-row">
+            <select name="spare_part_type">
                 <option value="">Все категории</option>
-                {% for cat in categories %}
-                <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+                {% for s in spare_part_types %}
+                <option value="{{ s }}" {% if spare_part_type == s %}selected{% endif %}>{{ s }}</option>
                 {% endfor %}
             </select>
             <input type="number" name="min_price" value="{{ min_price }}" placeholder="Цена от">
@@ -26,7 +55,7 @@
                 <option value="price_desc" {% if sort == 'price_desc' %}selected{% endif %}>Цена ↓</option>
             </select>
             <button type="submit" class="btn btn-primary">Найти</button>
-            {% if search or category or min_price or max_price %}
+            {% if search or make or model or generation or spare_part_type or oem or min_price or max_price %}
             <a href="/catalog" class="btn btn-secondary">Сбросить</a>
             {% endif %}
         </div>
@@ -65,7 +94,7 @@
     </div>
 
     {% if total_pages > 1 %}
-    {% set params = "search=" ~ search ~ "&category=" ~ category ~ "&min_price=" ~ min_price ~ "&max_price=" ~ max_price ~ "&sort=" ~ sort %}
+    {% set params = "search=" ~ search ~ "&make=" ~ make ~ "&model=" ~ model ~ "&generation=" ~ generation ~ "&spare_part_type=" ~ spare_part_type ~ "&oem=" ~ oem ~ "&min_price=" ~ min_price ~ "&max_price=" ~ max_price ~ "&sort=" ~ sort %}
     <div class="pagination">
         {% if page > 1 %}
         <a href="?page=1&{{ params }}" class="page-btn page-btn-arrow" title="Первая">«</a>

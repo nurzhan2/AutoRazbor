@@ -58,6 +58,13 @@ class Product(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
 
+    # Structured fields extracted from feed for fast filtering (carro.by-style)
+    make = Column(String, nullable=True, index=True)            # Марка
+    model = Column(String, nullable=True, index=True)           # Модель
+    generation = Column(String, nullable=True, index=True)      # Поколение
+    spare_part_type = Column(String, nullable=True, index=True)  # Категория запчастей
+    oem = Column(String, nullable=True, index=True)             # Оригинальный номер
+
 
 class Video(Base):
     __tablename__ = "videos"

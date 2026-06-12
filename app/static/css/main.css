@@ -108,7 +108,10 @@ select option { background: var(--surface); }
 .catalog-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
 .sync-badge { font-size: 12px; color: var(--text-muted); background: var(--surface2); padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); font-weight: 500; }
 .filter-form { background: var(--surface2); border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 24px; border: 1px solid var(--border); }
-.filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.filter-section-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; margin: 14px 0 8px; }
+.filter-form .filter-row:first-child { margin-bottom: 0; }
+.filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.filter-row:last-child { margin-bottom: 0; }
 .filter-row input, .filter-row select { flex: 1; min-width: 130px; background: var(--surface); }
 .results-info { color: var(--text-muted); font-size: 13px; margin-bottom: 20px; font-weight: 500; }
 

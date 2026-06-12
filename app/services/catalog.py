@@ -286,6 +286,10 @@ def parse_avito_xml_ad(ad) -> dict:
 
     ext_id = get("Id")
     make = get("Make")
+    model = get("Model")
+    generation = get("Generation")
+    spare_part_type = get("SparePartType")
+    oem = get("OEM")
 
     return {
         "external_id": ext_id,
@@ -298,6 +302,11 @@ def parse_avito_xml_ad(ad) -> dict:
         "article": get("Article") or get("VendorCode") or ext_id,
         "avito_url": get("Url"),
         "availability": get("Availability") or "в наличии",
+        "make": make,
+        "model": model,
+        "generation": generation,
+        "spare_part_type": spare_part_type,
+        "oem": oem,
     }
 
 
@@ -409,6 +418,11 @@ async def update_catalog(items) -> tuple[int, int, int]:
                     p.article = item.get("article") or p.article
                     p.avito_url = item.get("avito_url") or p.avito_url
                     p.availability = item.get("availability") or p.availability
+                    p.make = item.get("make") or p.make
+                    p.model = item.get("model") or p.model
+                    p.generation = item.get("generation") or p.generation
+                    p.spare_part_type = item.get("spare_part_type") or p.spare_part_type
+                    p.oem = item.get("oem") or p.oem
                     p.is_active = True
                     p.updated_at = now
                     updated += 1
@@ -424,6 +438,11 @@ async def update_catalog(items) -> tuple[int, int, int]:
                         article=item.get("article"),
                         avito_url=item.get("avito_url"),
                         availability=item.get("availability", "в наличии"),
+                        make=item.get("make"),
+                        model=item.get("model"),
+                        generation=item.get("generation"),
+                        spare_part_type=item.get("spare_part_type"),
+                        oem=item.get("oem"),
                         is_active=True,
                         updated_at=now,
                     )
