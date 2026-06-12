@@ -98,38 +98,23 @@ def parse_feed(content: bytes):
 
 
 def parse_xls_feed(content: bytes):
-    """Parse XLS/XLSX Avito export file as a generator (memory efficient)."""
+    """Parse XLS/XLSX Avito export file as a generator (memory efficient).
+
+    Uses python-calamine (Rust-based) which is much more memory efficient
+    than xlrd/openpyxl for large legacy .xls files - it streams rows as
+    plain Python lists without per-cell wrapper objects.
+    """
     import io
+    from python_calamine import CalamineWorkbook
 
-    # Try XLSX first (newer format)
-    try:
-        import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-        ws = wb.active
-        row_iter = ws.iter_rows(values_only=True)
-        headers = None
-        for row in row_iter:
-            if headers is None:
-                headers = [str(h).strip() if h else "" for h in row]
-                continue
-            if not any(row):
-                continue
-            item = _row_to_item(headers, row)
-            if item:
-                yield item
-        wb.close()
-        return
-    except Exception as e:
-        logger.info(f"openpyxl failed ({e}), trying xlrd")
+    wb = CalamineWorkbook.from_object(io.BytesIO(content))
+    sheet = wb.get_sheet_by_index(0)
 
-    # Try XLS (old format) - xlrd loads whole workbook into memory regardless,
-    # but we still yield row by row to avoid duplicating into a big list
-    import xlrd
-    wb = xlrd.open_workbook(file_contents=content)
-    ws = wb.sheet_by_index(0)
-    headers = [str(ws.cell_value(0, c)).strip() for c in range(ws.ncols)]
-    for r in range(1, ws.nrows):
-        row = [ws.cell_value(r, c) for c in range(ws.ncols)]
+    headers = None
+    for row in sheet.iter_rows():
+        if headers is None:
+            headers = [str(h).strip() if h is not None else "" for h in row]
+            continue
         if not any(row):
             continue
         item = _row_to_item(headers, row)
@@ -298,8 +283,10 @@ async def update_catalog(items) -> tuple[int, int, int]:
     Processes in small batches in its own DB session so we never hold
     the full feed (or all products) in memory at once.
     """
+    import gc
+
     now = datetime.utcnow()
-    BATCH = 200
+    BATCH = 100
 
     async with AsyncSessionLocal() as db:
         # Snapshot counts before sync (for stats)
@@ -363,6 +350,7 @@ async def update_catalog(items) -> tuple[int, int, int]:
             # Release references so they can be garbage collected before next batch
             existing.clear()
             db.expunge_all()
+            gc.collect()
 
         for item in items:
             if not item.get("external_id") or not item.get("title"):
