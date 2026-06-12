@@ -139,12 +139,6 @@ def parse_xml_feed(path: str):
     found_any = False
     context = etree.iterparse(path, events=("end",), tag=("Ad", "offer"))
     for _, elem in context:
-        if not found_any:
-            try:
-                raw = etree.tostring(elem, encoding="unicode")[:3000]
-                logger.info(f"[SYNC] first <{elem.tag}> sample:\n{raw}")
-            except Exception:
-                pass
         found_any = True
         if elem.tag == "Ad":
             yield parse_avito_xml_ad(elem)
@@ -263,22 +257,45 @@ def parse_avito_xml_ad(ad) -> dict:
         if url:
             photos.append(url.strip())
 
+    # Fields handled explicitly elsewhere - don't duplicate them in characteristics
+    EXCLUDE_FROM_CHARS = {
+        "Id", "Title", "Description", "Price", "Category", "Url",
+        "Availability", "Images", "Image", "Param", "CompatibleCars",
+        "Address", "ManagerName", "ContactPhone", "ContactMethod",
+        "AdType", "VendorCode", "Article",
+    }
+
     chars = {}
+    # New CARRO/Avito format: rich simple child tags (Make, Model, Generation,
+    # SparePartType, *SparePartType, Condition, GoodsType, ProductType, etc.)
+    for child in ad:
+        tag = child.tag
+        if not isinstance(tag, str) or tag in EXCLUDE_FROM_CHARS:
+            continue
+        if len(child) > 0:
+            continue  # skip nested structures like CompatibleCars
+        if child.text and child.text.strip():
+            chars[tag] = child.text.strip()
+
+    # Older Avito format: <Param name="..">value</Param>
     for param in ad.iter("Param"):
         name = param.get("name") or param.findtext("Name")
         value = param.get("value") or param.text
         if name and value:
             chars[name.strip()] = value.strip()
 
+    ext_id = get("Id")
+    make = get("Make")
+
     return {
-        "external_id": get("Id"),
+        "external_id": ext_id,
         "title": get("Title"),
         "description": get("Description"),
         "price": _parse_price(get("Price")),
         "photos": json.dumps(photos),
-        "characteristics": json.dumps(chars),
-        "category": get("Category"),
-        "article": get("Article") or get("VendorCode"),
+        "characteristics": json.dumps(chars, ensure_ascii=False),
+        "category": make or get("Category"),
+        "article": get("Article") or get("VendorCode") or ext_id,
         "avito_url": get("Url"),
         "availability": get("Availability") or "в наличии",
     }

@@ -172,9 +172,38 @@ async def product_detail(
     except Exception:
         product._photos_list = []
     try:
-        product._chars = json.loads(product.characteristics or "{}")
+        raw_chars = json.loads(product.characteristics or "{}")
     except Exception:
-        product._chars = {}
+        raw_chars = {}
+
+    CHAR_LABELS = {
+        "Make": "Марка",
+        "Model": "Модель",
+        "Generation": "Поколение",
+        "Year": "Год",
+        "Condition": "Состояние",
+        "GoodsType": "Тип товара",
+        "ProductType": "Категория",
+        "SparePartType": "Тип запчасти",
+        "OEM": "OEM номер",
+        "Brand": "Бренд",
+        "EngineType": "Тип двигателя",
+        "BodyType": "Тип кузова",
+        "FuelType": "Тип топлива",
+        "Transmission": "Коробка передач",
+        "Color": "Цвет",
+        "Country": "Страна",
+        "EngineVolume": "Объём двигателя",
+        # XLS-feed columns (Cyrillic) pass through as-is
+    }
+    product._chars = {}
+    for key, val in raw_chars.items():
+        # Drop noisy "*SparePartType" sub-fields that just repeat SparePartType info
+        if key.endswith("SparePartType") and key != "SparePartType":
+            label = "Узел"
+        else:
+            label = CHAR_LABELS.get(key, key)
+        product._chars[label] = val
 
     # Записать в историю просмотров
     from app.models.models import ViewHistory
