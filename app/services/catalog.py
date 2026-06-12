@@ -7,7 +7,7 @@ from typing import Optional
 import httpx
 from lxml import etree
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func, update
 
 from app.models.models import Product, SyncLog
 from app.models.database import AsyncSessionLocal
@@ -30,7 +30,7 @@ async def run_catalog_sync(feed_url: Optional[str] = None) -> SyncLog:
             content = await fetch_feed(url)
             items = parse_feed(content)
 
-            added, updated, removed = await update_catalog(db, items)
+            added, updated, removed = await update_catalog(items)
 
             log.status = "success"
             log.products_added = added
@@ -70,19 +70,16 @@ async def fetch_feed(url: str) -> bytes:
         return response.content
 
 
-def parse_feed(content: bytes) -> list[dict]:
-    """Parse XML/YML/CSV/XLS/XLSX Avito feed into list of product dicts"""
+def parse_feed(content: bytes):
+    """Parse XML/YML/CSV/XLS/XLSX Avito feed. Returns an iterator/generator of product dicts."""
     # Detect XLS/XLSX by magic bytes
-    if content[:8] in (b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1', b'PK\x03\x04PK\x03\x04') or content[:2] == b'PK':
-        return parse_xls_feed(content)
-    if content[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':
+    if (content[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1') or content[:2] == b'PK':
         return parse_xls_feed(content)
 
     # Try XML
     try:
         root = etree.fromstring(content)
     except etree.XMLSyntaxError:
-        # Try XLS by content sniff
         if b'\xd0\xcf\x11\xe0' in content[:8] or content[:4] == b'PK\x03\x04':
             return parse_xls_feed(content)
         return parse_csv_feed(content)
@@ -97,48 +94,47 @@ def parse_feed(content: bytes) -> list[dict]:
             items.append(parse_yml_offer(offer))
     if not items:
         raise ValueError("No items found in feed. Check feed format.")
-    return items
+    return iter(items)
 
 
-def parse_xls_feed(content: bytes) -> list[dict]:
-    """Parse XLS/XLSX Avito export file"""
+def parse_xls_feed(content: bytes):
+    """Parse XLS/XLSX Avito export file as a generator (memory efficient)."""
     import io
-    items = []
 
     # Try XLSX first (newer format)
     try:
         import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
         ws = wb.active
-        rows = list(ws.iter_rows(values_only=True))
-        if rows:
-            headers = [str(h).strip() if h else "" for h in rows[0]]
-            for row in rows[1:]:
-                if not any(row):
-                    continue
-                item = _row_to_item(headers, row)
-                if item:
-                    items.append(item)
-        return items
-    except Exception:
-        pass
-
-    # Try XLS (old format)
-    try:
-        import xlrd
-        wb = xlrd.open_workbook(file_contents=content)
-        ws = wb.sheet_by_index(0)
-        headers = [str(ws.cell_value(0, c)).strip() for c in range(ws.ncols)]
-        for r in range(1, ws.nrows):
-            row = [ws.cell_value(r, c) for c in range(ws.ncols)]
+        row_iter = ws.iter_rows(values_only=True)
+        headers = None
+        for row in row_iter:
+            if headers is None:
+                headers = [str(h).strip() if h else "" for h in row]
+                continue
             if not any(row):
                 continue
             item = _row_to_item(headers, row)
             if item:
-                items.append(item)
-        return items
+                yield item
+        wb.close()
+        return
     except Exception as e:
-        raise ValueError(f"Failed to parse XLS/XLSX: {e}")
+        logger.info(f"openpyxl failed ({e}), trying xlrd")
+
+    # Try XLS (old format) - xlrd loads whole workbook into memory regardless,
+    # but we still yield row by row to avoid duplicating into a big list
+    import xlrd
+    wb = xlrd.open_workbook(file_contents=content)
+    ws = wb.sheet_by_index(0)
+    headers = [str(ws.cell_value(0, c)).strip() for c in range(ws.ncols)]
+    for r in range(1, ws.nrows):
+        row = [ws.cell_value(r, c) for c in range(ws.ncols)]
+        if not any(row):
+            continue
+        item = _row_to_item(headers, row)
+        if item:
+            yield item
 
 
 # Column name mappings for Avito XLS export
@@ -295,62 +291,99 @@ def _parse_price(value) -> Optional[float]:
         return None
 
 
-async def update_catalog(db: AsyncSession, items: list[dict]) -> tuple[int, int, int]:
-    added = updated = removed = 0
+async def update_catalog(items) -> tuple[int, int, int]:
+    """
+    Memory-efficient catalog update.
+    `items` can be a list or a generator yielding product dicts.
+    Processes in small batches in its own DB session so we never hold
+    the full feed (or all products) in memory at once.
+    """
     now = datetime.utcnow()
+    BATCH = 200
 
-    # Filter valid items
-    valid_items = [i for i in items if i.get("external_id") and i.get("title")]
-    incoming_ids = {i["external_id"] for i in valid_items}
+    async with AsyncSessionLocal() as db:
+        # Snapshot counts before sync (for stats)
+        total_before = (await db.execute(select(func.count()).select_from(Product))).scalar() or 0
+        active_before = (await db.execute(
+            select(func.count()).select_from(Product).where(Product.is_active == True)
+        )).scalar() or 0
+        inactive_before = total_before - active_before
 
-    # Load all existing products in ONE query
-    result = await db.execute(select(Product))
-    existing_products = {p.external_id: p for p in result.scalars().all()}
-
-    # Deactivate products not in feed
-    for ext_id, product in existing_products.items():
-        if ext_id not in incoming_ids and product.is_active:
-            product.is_active = False
-            removed += 1
-
-    # Upsert in batches
-    BATCH = 500
-    for i in range(0, len(valid_items), BATCH):
-        batch = valid_items[i:i+BATCH]
-        for item in batch:
-            ext_id = item["external_id"]
-            if ext_id in existing_products:
-                p = existing_products[ext_id]
-                p.title = item["title"]
-                p.description = item.get("description") or p.description
-                p.price = item.get("price") or p.price
-                p.photos = item.get("photos") or p.photos
-                p.characteristics = item.get("characteristics") or p.characteristics
-                p.category = item.get("category") or p.category
-                p.article = item.get("article") or p.article
-                p.avito_url = item.get("avito_url") or p.avito_url
-                p.availability = item.get("availability") or p.availability
-                p.is_active = True
-                p.updated_at = now
-                updated += 1
-            else:
-                p = Product(
-                    external_id=ext_id,
-                    title=item["title"],
-                    description=item.get("description"),
-                    price=item.get("price"),
-                    photos=item.get("photos", "[]"),
-                    characteristics=item.get("characteristics", "{}"),
-                    category=item.get("category"),
-                    article=item.get("article"),
-                    avito_url=item.get("avito_url"),
-                    availability=item.get("availability", "в наличии"),
-                    is_active=True,
-                )
-                db.add(p)
-                existing_products[ext_id] = p
-                added += 1
+        # Mark everything inactive first - sync will reactivate what's still present.
+        await db.execute(update(Product).values(is_active=False))
         await db.commit()
+
+        updated = 0
+        batch: list[dict] = []
+
+        async def flush_batch(batch_items: list[dict]):
+            nonlocal updated
+            if not batch_items:
+                return
+            ext_ids = [i["external_id"] for i in batch_items]
+            result = await db.execute(
+                select(Product).where(Product.external_id.in_(ext_ids))
+            )
+            existing = {p.external_id: p for p in result.scalars().all()}
+
+            for item in batch_items:
+                ext_id = item["external_id"]
+                if ext_id in existing:
+                    p = existing[ext_id]
+                    p.title = item["title"]
+                    p.description = item.get("description") or p.description
+                    p.price = item.get("price") or p.price
+                    p.photos = item.get("photos") or p.photos
+                    p.characteristics = item.get("characteristics") or p.characteristics
+                    p.category = item.get("category") or p.category
+                    p.article = item.get("article") or p.article
+                    p.avito_url = item.get("avito_url") or p.avito_url
+                    p.availability = item.get("availability") or p.availability
+                    p.is_active = True
+                    p.updated_at = now
+                    updated += 1
+                else:
+                    p = Product(
+                        external_id=ext_id,
+                        title=item["title"],
+                        description=item.get("description"),
+                        price=item.get("price"),
+                        photos=item.get("photos", "[]"),
+                        characteristics=item.get("characteristics", "{}"),
+                        category=item.get("category"),
+                        article=item.get("article"),
+                        avito_url=item.get("avito_url"),
+                        availability=item.get("availability", "в наличии"),
+                        is_active=True,
+                        updated_at=now,
+                    )
+                    db.add(p)
+
+            await db.commit()
+            # Release references so they can be garbage collected before next batch
+            existing.clear()
+            db.expunge_all()
+
+        for item in items:
+            if not item.get("external_id") or not item.get("title"):
+                continue
+            batch.append(item)
+            if len(batch) >= BATCH:
+                await flush_batch(batch)
+                batch = []
+
+        # Flush remaining
+        await flush_batch(batch)
+
+        total_after = (await db.execute(select(func.count()).select_from(Product))).scalar() or 0
+        inactive_after = (await db.execute(
+            select(func.count()).select_from(Product).where(Product.is_active == False)
+        )).scalar() or 0
+
+    added = total_after - total_before
+    removed = max(inactive_after - inactive_before, 0)
+    # `updated` may double-count items that appear more than once in the feed; clamp for sanity
+    updated = max(updated - added, 0) if updated >= added else updated
 
     return added, updated, removed
 
