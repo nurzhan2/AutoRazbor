@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import resource
 from datetime import datetime
 from typing import Optional
 
@@ -17,6 +18,11 @@ logger = logging.getLogger(__name__)
 AVITO_FEED_URL = os.getenv("AVITO_FEED_URL", "")
 
 
+def _mem_mb() -> float:
+    """Current process peak RSS memory in MB (Linux: ru_maxrss is in KB)."""
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+
+
 async def run_catalog_sync(feed_url: Optional[str] = None) -> SyncLog:
     """Main entry point for catalog synchronization"""
     url = feed_url or AVITO_FEED_URL
@@ -27,10 +33,14 @@ async def run_catalog_sync(feed_url: Optional[str] = None) -> SyncLog:
         await db.refresh(log)
 
         try:
+            logger.info(f"[SYNC] start, mem={_mem_mb():.1f}MB")
             content = await fetch_feed(url)
+            logger.info(f"[SYNC] fetched {len(content)/1024:.1f}KB, mem={_mem_mb():.1f}MB")
             items = parse_feed(content)
+            logger.info(f"[SYNC] feed parser ready, mem={_mem_mb():.1f}MB")
 
             added, updated, removed = await update_catalog(items)
+            logger.info(f"[SYNC] update_catalog done, mem={_mem_mb():.1f}MB")
 
             log.status = "success"
             log.products_added = added
@@ -302,11 +312,14 @@ async def update_catalog(items) -> tuple[int, int, int]:
 
         updated = 0
         batch: list[dict] = []
+        processed_total = 0
+        batch_num = 0
 
         async def flush_batch(batch_items: list[dict]):
-            nonlocal updated
+            nonlocal updated, batch_num
             if not batch_items:
                 return
+            batch_num += 1
             ext_ids = [i["external_id"] for i in batch_items]
             result = await db.execute(
                 select(Product).where(Product.external_id.in_(ext_ids))
@@ -352,16 +365,21 @@ async def update_catalog(items) -> tuple[int, int, int]:
             db.expunge_all()
             gc.collect()
 
+            if batch_num % 10 == 0:
+                logger.info(f"[SYNC] batch {batch_num} ({processed_total} items), mem={_mem_mb():.1f}MB")
+
         for item in items:
             if not item.get("external_id") or not item.get("title"):
                 continue
             batch.append(item)
+            processed_total += 1
             if len(batch) >= BATCH:
                 await flush_batch(batch)
                 batch = []
 
         # Flush remaining
         await flush_batch(batch)
+        logger.info(f"[SYNC] all batches done ({processed_total} items), mem={_mem_mb():.1f}MB")
 
         total_after = (await db.execute(select(func.count()).select_from(Product))).scalar() or 0
         inactive_after = (await db.execute(
