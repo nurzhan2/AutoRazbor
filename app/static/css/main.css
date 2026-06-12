@@ -200,3 +200,14 @@ select option { background: var(--surface); }
 @media (max-width: 768px) {
   .mini-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
 }
+
+/* DESCRIPTION HTML CONTENT (from feed) */
+.description-html { color: var(--text-dim); font-size: 14px; line-height: 1.7; }
+.description-html p { margin-bottom: 10px; }
+.description-html ul, .description-html ol { margin: 10px 0 10px 20px; }
+.description-html li { margin-bottom: 4px; }
+.description-html strong, .description-html b { color: var(--text); font-weight: 700; }
+.description-html h1, .description-html h2, .description-html h3 { font-size: 15px; font-weight: 700; color: var(--text); margin: 14px 0 6px; }
+.description-html a { color: var(--text); text-decoration: underline; }
+.description-html img { max-width: 100%; border-radius: var(--radius-sm); margin: 8px 0; }
+.description-html .Markdown-Word { display: inline; }

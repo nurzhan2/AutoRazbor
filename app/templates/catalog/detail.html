@@ -56,7 +56,7 @@
             {% if product.description %}
             <div class="product-description">
                 <h3>Описание</h3>
-                <p>{{ product.description }}</p>
+                <div class="description-html">{{ product.description | safe }}</div>
             </div>
             {% endif %}
 

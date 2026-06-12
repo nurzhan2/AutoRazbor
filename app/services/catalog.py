@@ -139,6 +139,12 @@ def parse_xml_feed(path: str):
     found_any = False
     context = etree.iterparse(path, events=("end",), tag=("Ad", "offer"))
     for _, elem in context:
+        if not found_any:
+            try:
+                raw = etree.tostring(elem, encoding="unicode")[:3000]
+                logger.info(f"[SYNC] first <{elem.tag}> sample:\n{raw}")
+            except Exception:
+                pass
         found_any = True
         if elem.tag == "Ad":
             yield parse_avito_xml_ad(elem)
