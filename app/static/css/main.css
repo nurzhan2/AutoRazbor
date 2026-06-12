@@ -253,10 +253,10 @@ select option { background: var(--surface); }
 .categories-section { margin-bottom: 28px; }
 .categories-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
 .category-card {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: flex-start;
   background: var(--surface2); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 14px 16px; min-height: 70px;
-  color: var(--text); transition: all .15s; gap: 8px;
+  color: var(--text); transition: all .15s; gap: 4px;
 }
 .category-card:hover { border-color: #ccc; box-shadow: 0 4px 16px rgba(0,0,0,.08); transform: translateY(-2px); }
 .category-card span { font-size: 14px; font-weight: 700; line-height: 1.25; }
