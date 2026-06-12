@@ -9,6 +9,39 @@
         {% endif %}
     </div>
 
+    <div class="brands-section">
+        <h2 class="brands-title">Подбор по марке авто</h2>
+        <div class="brands-grid">
+            {% for brand_label, brand_search, brand_img in [
+                ('Audi', 'Audi', 'audi.png'),
+                ('BMW', 'BMW', 'bmw.png'),
+                ('Ford', 'Ford', 'ford.png'),
+                ('Geely', 'Geely', 'gelly.png'),
+                ('Haval', 'Haval', 'haval.png'),
+                ('Honda', 'Honda', 'honda.png'),
+                ('Hyundai', 'Hyundai', 'hundai.png'),
+                ('Kia', 'Kia', 'kia.png'),
+                ('Lexus', 'Lexus', 'lexus.png'),
+                ('Mazda', 'Mazda', 'mazda.png'),
+                ('Mercedes-Benz', 'Mercedes', 'mercedes.png'),
+                ('Mitsubishi', 'Mitsubishi', 'mitsubishi.png'),
+                ('Nissan', 'Nissan', 'nissan.png'),
+                ('Opel', 'Opel', 'opel.png'),
+                ('Peugeot', 'Peugeot', 'peugeot.png'),
+                ('Renault', 'Renault', 'reno.png'),
+                ('Skoda', 'Skoda', 'skoda.png'),
+                ('Toyota', 'Toyota', 'toyota.png'),
+                ('Volkswagen', 'Volkswagen', 'Wolswagen.png'),
+                ('Volvo', 'Volvo', 'volvo.png'),
+            ] %}
+            <a href="/catalog?search={{ brand_search }}" class="brand-card">
+                <img src="/static/img/brands/{{ brand_img }}" alt="{{ brand_label }}" loading="lazy">
+                <span>{{ brand_label }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
     <form method="get" action="/catalog" class="filter-form">
         <div class="filter-row">
             <input type="text" name="search" value="{{ search }}" placeholder="Поиск по названию или артикулу...">
