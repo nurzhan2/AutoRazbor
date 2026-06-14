@@ -71,10 +71,46 @@ async def catalog(
             Product.part_name, Product.spare_part_type, Product.oem,
         ]
 
+        # If a search word matches a known part category (spare_part_type)
+        # or sub-category (part_name), boost matching products to the top -
+        # e.g. searching "двигатель" should surface engines first, not just
+        # any product whose description happens to mention the word.
+        CATEGORY_KEYWORDS = {
+            "двигатель": "Двигатель", "двигатели": "Двигатель",
+            "подвеска": "Подвеска",
+            "кузов": "Кузов",
+            "салон": "Салон",
+            "электрооборудование": "Электрооборудование", "электрика": "Электрооборудование",
+            "охлаждение": "Система охлаждения",
+            "тормоза": "Тормозная система", "тормозная": "Тормозная система",
+            "трансмиссия": "Трансмиссия и привод", "привод": "Трансмиссия и привод",
+            "автосвет": "Автосвет", "свет": "Автосвет",
+            "топливная": "Топливная и выхлопная система", "выхлоп": "Топливная и выхлопная система",
+            "рулевое": "Рулевое управление", "руль": "Рулевое управление",
+            "стекла": "Стекла", "стекло": "Стекла",
+            "аккумулятор": "Аккумуляторы", "аккумуляторы": "Аккумуляторы",
+            # part_name (Узел/деталь) keywords
+            "бампер": "Бампер", "бамперы": "Бампер",
+            "рычаг": "Рычаг", "рычаги": "Рычаг",
+            "капот": "Капот", "капоты": "Капот",
+            "фара": "Фара", "фары": "Фара",
+            "фонарь": "Фонарь", "фонари": "Фонарь",
+        }
+
         # Normalize hyphens to spaces so "Mercedes-Benz" matches "mercedes benz"
         # and vice versa (hyphens stripped from both query and DB columns).
         search_norm = search.lower().replace("-", " ")
         words = [w.strip() for w in search_norm.split() if len(w.strip()) >= 2]
+
+        category_boost = None
+        for word in words:
+            if word in CATEGORY_KEYWORDS:
+                target = CATEGORY_KEYWORDS[word]
+                category_boost = or_(
+                    Product.spare_part_type == target,
+                    Product.part_name == target,
+                )
+                break
 
         word_conditions = []
         for word in words:
@@ -106,6 +142,11 @@ async def catalog(
                 query = query.where(or_(*word_conditions))
                 relevance = sum(cast(c, Integer) for c in word_conditions)
                 query = query.order_by(relevance.desc())
+
+            if category_boost is not None:
+                # Matching category/part products first, then by existing relevance/recency
+                existing_order = list(query._order_by_clauses) if query._order_by_clauses else []
+                query = query.order_by(cast(category_boost, Integer).desc(), *existing_order)
 
     # Structured carro.by-style filters
     if make:
