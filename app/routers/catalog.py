@@ -3,7 +3,7 @@ from fastapi import APIRouter, Request, Depends, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, and_, func, cast, Integer
 
 from app.models.database import get_db
 from app.models.models import Product, SyncLog
@@ -63,9 +63,20 @@ async def catalog(
             "бампер": "бампер", "колесо": "колес", "колёса": "колес",
             "диск": "диск", "тормоз": "тормоз", "подвеска": "подвеск",
         }
-        search_lower = search.lower()
-        words = [w.strip() for w in search_lower.split() if len(w.strip()) >= 2]
 
+        # Fields searched - covers free text + structured carro.by data
+        SEARCH_FIELDS = [
+            Product.title, Product.article, Product.description,
+            Product.make, Product.model, Product.generation,
+            Product.part_name, Product.spare_part_type, Product.oem,
+        ]
+
+        # Normalize hyphens to spaces so "Mercedes-Benz" matches "mercedes benz"
+        # and vice versa (hyphens stripped from both query and DB columns).
+        search_norm = search.lower().replace("-", " ")
+        words = [w.strip() for w in search_norm.split() if len(w.strip()) >= 2]
+
+        word_conditions = []
         for word in words:
             # Build variants: original word + transliterated version (if different)
             variants = {word}
@@ -74,15 +85,27 @@ async def catalog(
                 translated = translated.replace(ru, en)
             variants.add(translated)
 
-            conditions = []
+            field_conditions = []
             for variant in variants:
-                conditions.extend([
-                    Product.title.ilike(f"%{variant}%"),
-                    Product.article.ilike(f"%{variant}%"),
-                    Product.description.ilike(f"%{variant}%"),
-                ])
-            # AND between words, OR between variants/fields
-            query = query.where(or_(*conditions))
+                for field in SEARCH_FIELDS:
+                    field_conditions.append(
+                        func.replace(field, "-", " ").ilike(f"%{variant}%")
+                    )
+            word_conditions.append(or_(*field_conditions))
+
+        if word_conditions:
+            # Try strict match: ALL words must be found somewhere
+            strict_query = query.where(and_(*word_conditions))
+            strict_count = await db.execute(
+                select(func.count()).select_from(strict_query.subquery())
+            )
+            if strict_count.scalar() > 0:
+                query = strict_query
+            else:
+                # Relax: ANY word may match, rank results by how many words matched
+                query = query.where(or_(*word_conditions))
+                relevance = sum(cast(c, Integer) for c in word_conditions)
+                query = query.order_by(relevance.desc())
 
     # Structured carro.by-style filters
     if make:
