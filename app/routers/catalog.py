@@ -144,9 +144,22 @@ async def catalog(
                 query = query.order_by(relevance.desc())
 
             if category_boost is not None:
-                # Matching category/part products first, then by existing relevance/recency
+                # Within the boosted category, prioritize products whose title
+                # STARTS WITH the search word (e.g. "Двигатель в сборе...")
+                # over those where it just appears mid-title
+                # (e.g. "Кронштейн крепления двигателя...").
+                title_starts_boost = or_(*[
+                    func.replace(Product.title, "-", " ").ilike(f"{w}%")
+                    for w in words
+                ])
+                # Matching category/part products first, then title-prefix match,
+                # then by existing relevance/recency
                 existing_order = list(query._order_by_clauses) if query._order_by_clauses else []
-                query = query.order_by(cast(category_boost, Integer).desc(), *existing_order)
+                query = query.order_by(
+                    cast(category_boost, Integer).desc(),
+                    cast(title_starts_boost, Integer).desc(),
+                    *existing_order,
+                )
 
     # Structured carro.by-style filters
     if make:
