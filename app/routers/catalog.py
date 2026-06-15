@@ -16,6 +16,80 @@ templates = Jinja2Templates(directory="app/templates")
 ITEMS_PER_PAGE = 100
 
 
+def _levenshtein(a: str, b: str) -> int:
+    """Standard edit-distance between two strings."""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cost = 0 if ca == cb else 1
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+        prev = cur
+    return prev[-1]
+
+
+# Known dictionary of brand names, part categories, and common auto terms
+# used to autocorrect typos in search queries (e.g. "аккамулятор" -> "аккумулятор").
+# Word-length-dependent typo tolerance: short words allow fewer edits to avoid
+# false corrections (e.g. "бмв" should not fuzzy-match unrelated 3-letter words).
+KNOWN_TERMS = [
+    # Brands (Cyrillic)
+    "ауди", "бмв", "форд", "джили", "хавал", "хонда", "хендай", "хюндай", "киа",
+    "лексус", "мазда", "мерседес", "митсубиси", "ниссан", "опель", "пежо",
+    "рено", "шкода", "тойота", "фольксваген", "вольво", "порше", "сузуки",
+    "субару", "инфинити", "акура", "бентли", "джип",
+    # Brands (Latin)
+    "audi", "bmw", "ford", "geely", "haval", "honda", "hyundai", "kia",
+    "lexus", "mazda", "mercedes", "mitsubishi", "nissan", "opel", "peugeot",
+    "renault", "skoda", "toyota", "volkswagen", "volvo", "porsche", "suzuki",
+    "subaru", "infiniti", "acura", "bentley", "jeep",
+    # Part categories (spare_part_type)
+    "электрооборудование", "электрика", "салон", "кузов", "подвеска",
+    "двигатель", "двигатели", "охлаждение", "тормоз", "тормоза", "тормозная",
+    "трансмиссия", "привод", "автосвет", "топливная", "выхлоп",
+    "рулевое", "руль", "стекла", "стекло", "аккумулятор", "аккумуляторы",
+    # part_name / common car part terms
+    "бампер", "бамперы", "рычаг", "рычаги", "капот", "капоты", "фара", "фары",
+    "фонарь", "фонари", "генератор", "стартер", "радиатор", "турбина",
+    "турбины", "форсунка", "форсунки", "поршень", "коленвал", "распредвал",
+    "сцепление", "сайлентблок", "амортизатор", "пружина", "ступица",
+    "суппорт", "колодки", "диск", "диски", "шина", "шины", "крыло",
+    "дверь", "двери", "зеркало", "решетка", "решётка", "глушитель",
+    "катализатор", "компрессор", "насос", "помпа", "термостат",
+    "интеркулер", "патрубок", "коллектор", "прокладка", "датчик",
+    "проводка", "блок", "редуктор", "полуось", "шрус", "карданный",
+    "раздатка", "коробка", "акпп", "мкпп", "вариатор", "сабвуфер",
+    "магнитола", "торпедо", "руль", "сиденье", "сиденья", "airbag", "подушка",
+]
+
+
+def _autocorrect_word(word: str) -> str | None:
+    """If `word` is a near-miss (typo) of a known term, return the
+    corrected term. Returns None if the word is already correct or
+    no close-enough match exists."""
+    if word in KNOWN_TERMS:
+        return None  # already correct, no correction needed
+    if len(word) < 4:
+        return None  # too short to safely fuzzy-match
+    max_dist = 1 if len(word) <= 6 else 2
+    best, best_dist = None, max_dist + 1
+    for term in KNOWN_TERMS:
+        if abs(len(term) - len(word)) > max_dist:
+            continue
+        d = _levenshtein(word, term)
+        if d < best_dist:
+            best, best_dist = term, d
+    if best is not None and best_dist <= max_dist:
+        return best
+    return None
+
+
 @router.get("/catalog", response_class=HTMLResponse)
 async def catalog(
     request: Request,
@@ -104,8 +178,13 @@ async def catalog(
 
         category_boost = None
         for word in words:
-            if word in CATEGORY_KEYWORDS:
-                target = CATEGORY_KEYWORDS[word]
+            lookup_word = word
+            if lookup_word not in CATEGORY_KEYWORDS:
+                corrected = _autocorrect_word(word)
+                if corrected and corrected in CATEGORY_KEYWORDS:
+                    lookup_word = corrected
+            if lookup_word in CATEGORY_KEYWORDS:
+                target = CATEGORY_KEYWORDS[lookup_word]
                 category_boost = or_(
                     Product.spare_part_type == target,
                     Product.part_name == target,
@@ -120,6 +199,13 @@ async def catalog(
             for ru, en in translit.items():
                 translated = translated.replace(ru, en)
             variants.add(translated)
+
+            # Autocorrect typos against known brands/categories/auto terms
+            # (e.g. "аккамулятор" -> "аккумулятор") and search for the
+            # corrected term too.
+            corrected = _autocorrect_word(word)
+            if corrected:
+                variants.add(corrected)
 
             field_conditions = []
             for variant in variants:
