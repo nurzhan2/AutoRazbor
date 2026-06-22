@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  autorazbor:
+    build: .
+    container_name: autorazbor
+    restart: always
+    ports:
+      - "80:8080"
+    volumes:
+      # Persistent SQLite database - survives container restarts/rebuilds
+      - autorazbor_data:/data
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////data/autoparts.db
+      - SECRET_KEY=${SECRET_KEY}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - YUKASSA_SHOP_ID=${YUKASSA_SHOP_ID:-}
+      - YUKASSA_SECRET_KEY=${YUKASSA_SECRET_KEY:-}
+      - AVITO_FEED_URL=${AVITO_FEED_URL:-https://st.carrobiz.com/export/1070/avitoru-yoularu-1070-15.xml}
+      - AVITO_UPDATE_HOUR=${AVITO_UPDATE_HOUR:-3}
+      - AVITO_UPDATE_MINUTE=${AVITO_UPDATE_MINUTE:-0}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  autorazbor_data:
